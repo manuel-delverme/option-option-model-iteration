@@ -20,7 +20,7 @@ def batched_option_model(mdp, option_policies, option_termination_prob):
     reward_model = np.einsum('sot,nos->not', successor_features, r_pi)  # TODO: is it `t` or `s` on the right-hand side?
     P_model = np.einsum("sot,tok->sok", successor_features, termination_kernels)
 
-    assert np.all(P_model > 0)
+    assert np.all(P_model >= 0)
     return P_model, reward_model
 
 

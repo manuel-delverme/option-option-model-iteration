@@ -89,15 +89,17 @@ def make_termination_model(termination_fn, continuation_model):
     return termination_distr + continuation_distr
 
 
-def beta_option_optimization(base_option_set, termination_fn, G):
+def beta_option_optimization(option_models, termination_vector, G):
+    OBs = [make_termination_model(termination_vector, option_model) for option_model in option_models]
+
     def loss_fn(old_pi):
-        expectation_model(old_pi, base_option_set)
-        termination_model_BM = make_termination_model(termination_fn, option_model)
+        E_O_E_B = expectation_model(old_pi, OBs)
         OB = onp.einsum("sat,sat->", option_model, termination_model_BM)
         OG = onp.einsum("sat,sat->", OB, G)
         return OG
 
-    loss_value = loss_fn(current_model)
+    initial_policy = onp.ones(option_models[0].shape) / option_models[0].shape[0]
+    loss_value = loss_fn(initial_policy)
 
     expected_option = expectation_model(meta_policy, option_models)
 
@@ -114,15 +116,17 @@ def option_option_model_expectation_equation(meta_policy, option_models, value_m
     return ...
 
 
-def oomi(base_option_models, subgoal_models, true_value_model_Gminus):
+def oomi(base_option_models, subgoal_models, true_value_model_Gminus, termination_vectors):
     num_tasks = len(subgoal_models)
     current_option_models = [true_value_model_Gminus.copy() for _ in range(num_tasks)]
     for k in range(100):
         for task_idx in range(num_tasks):
             old_option_model = current_option_models[task_idx]
+            termination_vector = termination_vectors[task_idx]
             base_option_model = base_option_models[task_idx]
+
             # new_option_model = option_termination_optimization(old_option_model)
-            new_option_model = beta_option_optimization(old_option_model, base_option_model, true_value_model_Gminus)  # (base_option_set, termination_fn, G)
+            new_option_model = beta_option_optimization(old_option_model, termination_vector, true_value_model_Gminus)  # (option_models, termination_vector, G)
             current_option_models[task_idx] = new_option_model
 
 
@@ -150,7 +154,7 @@ def main():
         pi, vf = emdp.algorithms.tabular.solve_mdp(mdp)
         pi_onehot = onp.eye(mdp.num_actions)[pi, :]
         option_policies.append(pi_onehot)
-        beta = onp.ones(mdp.num_states) * 0.5  # TODO: where does this come from? should it be 1 at the subgoal?
+        beta = onp.random.randint(0, 2, mdp.num_states)  # TODO: where does this come from? should it be 1 at the subgoal?
         option_terminations.append(beta)
 
     option_policies = onp.array(option_policies)
@@ -165,7 +169,7 @@ def main():
         option_model = make_option_model(option_reward_vector=option_reward_model, option_transition_model=P_models[:, option_idx])
         option_modules.append(option_model)
 
-    oomi(option_modules, subgoal_value_models, mdp_value_fn)
+    oomi(option_modules, subgoal_value_models, mdp_value_fn, option_terminations)
     print(mdp_value_fn)
 
 
