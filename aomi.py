@@ -46,7 +46,8 @@ def make_option_value_function(state, action_model, option_model):  # Q(s, o=*)
 
 def mdp_to_value_model(mdp):
     pi_, optimal_value_function = emdp.algorithms.tabular.solve_mdp(mdp)
-    import pdb;pdb.set_trace()
+    import pdb;
+    pdb.set_trace()
     return make_value_model(optimal_value_function)
 
 
@@ -130,47 +131,49 @@ def main():
     mdp = emdp.chainworld.toy_mdps.dadashi_fig2d()
 
     # Define Option Model
-    option_model = np.zeros((mdp.reward.shape[0]+1,mdp.reward.shape[0]+1))
-    option_model[0,0] = 1
+    num_states = mdp.reward.shape[0]
+    empty = np.zeros((1 + num_states, 1 + num_states))
+    empty[0, 0] = 1
 
-    #Define Goal Value Model
-    goal_model = np.zeros((mdp.reward.shape[0]+1,mdp.reward.shape[0]+1))
-    goal_model[0,0] = 1
-    goal_model[-1,0] = 2
+    option_model = empty.copy()
 
-    #Define Action Models
+    # Define Goal Value Model
+    goal_value_model = empty.copy()
+    goal_value_model[1:, 0] = (0, 2)
+
+    # Define Action Models
     action_models = []
     for a in range(mdp.num_actions):
-        action_model = np.zeros((mdp.reward.shape[0]+1,mdp.reward.shape[0]+1))
-        action_model[0,0] = 1
-        action_model[1:,1:] = mdp.transition[a] * 0.9
-        action_model[1:,0] = mdp.reward[:,a]
+        action_model = empty.copy()
+        action_model[1:, 1:] = mdp.transition[:, a] * mdp.discount
+        action_model[1:, 0] = mdp.reward[:, a]
         action_models.append(action_model)
 
     # Iterate
-    for i in range(100): # the most linear implementation
-        for s in range(mdp.num_states):
-            max_val = -np.inf
-            old_option_model = option_model.copy() # save model for calculations
-            for action_model in action_models:
-                
-                continuation_value = action_model[1+s].dot(old_option_model.dot(goal_model[:,0]))
-                termination_value = action_model[1+s].dot(goal_model[:,0])
+    goal_reward_vector_h = goal_value_model[:, 0]
 
+    for i in range(100):  # the most linear implementation
+        for s_idx in range(mdp.num_states):
+            s = np.eye(mdp.num_actions + 1)[s_idx + 1]
+            max_val = -np.inf
+            old_option_model = option_model.copy()  # save model for calculations
+
+            for action_model in action_models:
+                rasp_sA = s.dot(action_model)
+                one_step_option_reward_h = old_option_model.dot(goal_reward_vector_h)
+
+                continuation_value = rasp_sA.dot(one_step_option_reward_h)
+                termination_value = rasp_sA.dot(goal_reward_vector_h)
 
                 if termination_value > continuation_value:
                     if termination_value > max_val:
-                        option_model[1+s] = action_model[1+s]
+                        option_model[s.astype(bool)] = rasp_sA
                         max_val = termination_value
                 else:
                     if continuation_value > max_val:
-                        option_model[1+s] = action_model[1+s].dot(option_model)
+                        option_model[s.astype(bool)] = rasp_sA.dot(option_model)
                         max_val = continuation_value
     print(option_model)
-
-
-
-    
 
 
 if __name__ == "__main__":
