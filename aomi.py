@@ -1,6 +1,7 @@
 import numpy as np
 import emdp.chainworld.toy_mdps
 import emdp.algorithms.tabular
+import emdp.gridworld
 import option_utils
 
 
@@ -128,18 +129,18 @@ def oomi(base_option_models, subgoal_models, true_value_model_Gminus):
 
 
 def main():
-    mdp = emdp.chainworld.toy_mdps.dadashi_fig2d()
+    mdp = emdp.gridworld.GridWorldMDP(goal=(1, 1))
 
     # Define Option Model
     num_states = mdp.reward.shape[0]
     empty = np.zeros((1 + num_states, 1 + num_states))
     empty[0, 0] = 1
 
-    option_model = empty.copy()
+    option_model_M = empty.copy()
 
     # Define Goal Value Model
-    goal_value_model = empty.copy()
-    goal_value_model[1:, 0] = (0, 2)
+    goal_value_model_G = empty.copy()
+    goal_value_model_G[-2, 0] = 2  # -1 is a wall
 
     # Define Action Models
     action_models = []
@@ -150,30 +151,33 @@ def main():
         action_models.append(action_model)
 
     # Iterate
-    goal_reward_vector_h = goal_value_model[:, 0]
+    # sub_goal_vector = goal_value_model[:, 0]
 
     for i in range(100):  # the most linear implementation
         for s_idx in range(mdp.num_states):
-            s = np.eye(mdp.num_actions + 1)[s_idx + 1]
+            s = np.eye(mdp.num_states + 1)[s_idx + 1]
             max_val = -np.inf
-            old_option_model = option_model.copy()  # save model for calculations
+            old_option_model_M = option_model_M.copy()  # save model for calculations
 
             for action_model in action_models:
-                rasp_sA = s.dot(action_model)
-                one_step_option_reward_h = old_option_model.dot(goal_reward_vector_h)
+                next_rasp_sA = s.dot(action_model)
+                old_option_value_MG = np.einsum("st,st->st", old_option_model_M, goal_value_model_G)
 
-                continuation_value = rasp_sA.dot(one_step_option_reward_h)
-                termination_value = rasp_sA.dot(goal_reward_vector_h)
+                continuation_rasp = next_rasp_sA.dot(old_option_value_MG)
+                termination_rasp = next_rasp_sA.dot(goal_value_model_G)
+
+                continuation_value = continuation_rasp[0]
+                termination_value = termination_rasp[0]
 
                 if termination_value > continuation_value:
                     if termination_value > max_val:
-                        option_model[s.astype(bool)] = rasp_sA
+                        option_model_M[s.astype(bool)] = next_rasp_sA
                         max_val = termination_value
                 else:
                     if continuation_value > max_val:
-                        option_model[s.astype(bool)] = rasp_sA.dot(option_model)
+                        option_model_M[s.astype(bool)] = next_rasp_sA.dot(option_model_M)
                         max_val = continuation_value
-    print(option_model)
+    print(option_model_M)
 
 
 if __name__ == "__main__":
