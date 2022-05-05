@@ -17,9 +17,8 @@ def main():
 
     # Define Goal Value Model
     goal_value_model_G = empty.copy()
-    bottleneck_value = np.zeros(num_states)
-    # bottleneck_value[[22, 38, 42, 58]] = 1 # Bottlenecks
-    goal_value_model_G[1:, 0] = bottleneck_value  # mdp.reward.max(axis=1)
+    goal_value_model_G[1 + 60, 0] = 2.
+    # goal_value_model_G[1:, 0] = mdp.reward.max(axis=1)
 
     # Define Action Models
     action_models = []
@@ -29,38 +28,43 @@ def main():
         action_model[1:, 0] = mdp.reward[:, a]
         action_models.append(action_model)
     action_models = np.array(action_models)
-    no_op_model = np.eye(1 + num_states)
 
-    for i in range(100):  # the most linear implementation
+    for i in range(1000):  # the most linear implementation
+        if option_model_M[1:, 1:].any():
+            mdp.plot_ss(f"option_model{i}", option_model_M[1:, 1:], min_weight=0.01)
+            plt.savefig(f"plots/option_model{i}.png")
+            plt.close()
+        else:
+            print("Option Model is empty at step", i)
+
         for s_idx in range(mdp.num_states):
             s = np.eye(mdp.num_states + 1)[s_idx + 1]
             max_val = -np.inf
             old_option_model_M = option_model_M.copy()  # save model for calculations
-            continuation_model = np.einsum("st,tu->su", old_option_model_M, goal_value_model_G)
-            termination_model = np.einsum("st,tu->su", no_op_model, goal_value_model_G)
 
             for action_model in action_models:
                 next_rasp_sA = s.dot(action_model)
+                old_option_value_MG = np.einsum("st,tu->su", old_option_model_M, goal_value_model_G)
 
-                continuation_rasp = next_rasp_sA.dot(continuation_model)
-                termination_rasp = next_rasp_sA.dot(termination_model)
+                continuation_rasp = next_rasp_sA.dot(old_option_value_MG)
+                termination_rasp = next_rasp_sA.dot(goal_value_model_G)
 
                 continuation_value = continuation_rasp[0]
                 termination_value = termination_rasp[0]
 
                 if termination_value > continuation_value:
                     if termination_value > max_val:
-                        new_best_rasp = next_rasp_sA
+                        option_model_M[s.astype(bool)] = next_rasp_sA
                         max_val = termination_value
                 else:
                     if continuation_value > max_val:
-                        new_best_rasp = next_rasp_sA.dot(option_model_M)
+                        option_model_M[s.astype(bool)] = next_rasp_sA.dot(option_model_M)
                         max_val = continuation_value
 
-            option_model_M[s.astype(bool)] = new_best_rasp
-
     vf = option_model_M[1:, 0]
-    mdp.plot_s("vf", vf)
+    mdp.plot_s(f"vf", vf)
+    plt.show()
+    mdp.plot_ss(f"P", option_model_M[1:, 1:])
     plt.show()
 
 

@@ -27,18 +27,14 @@ def main():
     goal_value_model_G[1 + 18, 0] = 2.
     # goal_value_model_G[1:, 0] = mdp.reward.max(axis=1)
 
-    # import pdb;pdb.set_trace()
-
     # Define Action Models
     action_models = []
     for a in range(mdp.num_actions):
         action_model = empty.copy()
         action_model[1:, 1:] = mdp.transition[:, a] * mdp.discount
-        # action_model[1:, 0] = mdp.reward[:, a]
+        action_model[1:, 0] = mdp.reward[:, a]
         action_models.append(action_model)
     action_models = np.array(action_models)
-    mdp.plot_ss(f"P", option_model_M[1:, 1:])
-    plt.show()
 
     for i in range(1000):  # the most linear implementation
         if i < 10 and i % 2 == 0:
@@ -51,9 +47,7 @@ def main():
             max_val = -np.inf
             old_option_model_M = option_model_M.copy()  # save model for calculations
 
-
             for action_model in action_models:
-
                 next_rasp_sA = s.dot(action_model)
                 old_option_value_MG = np.einsum("st,tu->su", old_option_model_M, goal_value_model_G)
 
@@ -72,7 +66,8 @@ def main():
                         option_model_M[s.astype(bool)] = next_rasp_sA.dot(option_model_M)
                         max_val = continuation_value
 
-    import pdb;pdb.set_trace()
+    import pdb;
+    pdb.set_trace()
     mdp.plot_ss(f"P", option_model_M[1:, 1:])
     plt.show()
     vf = option_model_M[1:, 0]
