@@ -6,7 +6,14 @@ import emdp.gridworld
 
 
 def main():
-    mdp = emdp.gridworld.GridWorldMDP(goal=(1, 1))
+
+    ascii_room = """
+    #####
+    #   #
+    #   #
+    #   #
+    #####"""[1:].split('\n')
+    mdp = emdp.gridworld.GridWorldMDP(goal=(1, 1),ascii_room=ascii_room)
 
     # import pdb;pdb.set_trace()
     # Define Option Model
