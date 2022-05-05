@@ -6,14 +6,13 @@ import emdp.gridworld
 
 
 def main():
-
     ascii_room = """
     #####
     #   #
     #   #
     #   #
     #####"""[1:].split('\n')
-    mdp = emdp.gridworld.GridWorldMDP(goal=(1, 1),ascii_room=ascii_room)
+    mdp = emdp.gridworld.GridWorldMDP(goal=(1, 1), ascii_room=ascii_room)
 
     # import pdb;pdb.set_trace()
     # Define Option Model
@@ -25,7 +24,7 @@ def main():
 
     # Define Goal Value Model
     goal_value_model_G = empty.copy()
-    goal_value_model_G[1+18,0] = 2.
+    goal_value_model_G[1 + 18, 0] = 2.
     # goal_value_model_G[1:, 0] = mdp.reward.max(axis=1)
 
     # import pdb;pdb.set_trace()
@@ -38,8 +37,15 @@ def main():
         # action_model[1:, 0] = mdp.reward[:, a]
         action_models.append(action_model)
     action_models = np.array(action_models)
+    mdp.plot_ss(f"P", option_model_M[1:, 1:])
+    plt.show()
 
     for i in range(1000):  # the most linear implementation
+        if i < 10 and i % 2 == 0:
+            mdp.plot_ss(f"P{i}", option_model_M[1:, 1:], min_weight=0.01)
+            plt.show()
+            plt.close()
+
         for s_idx in range(mdp.num_states):
             s = np.eye(mdp.num_states + 1)[s_idx + 1]
             max_val = -np.inf
@@ -67,6 +73,8 @@ def main():
                         max_val = continuation_value
 
     import pdb;pdb.set_trace()
+    mdp.plot_ss(f"P", option_model_M[1:, 1:])
+    plt.show()
     vf = option_model_M[1:, 0]
     mdp.plot_s("vf", vf)
     plt.show()
