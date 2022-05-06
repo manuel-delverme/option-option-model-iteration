@@ -24,25 +24,23 @@ def main():
 
     # Define Goal Value Model
     goal_value_model_G = empty.copy()
-    goal_value_model_G[1 + 18, 0] = 1
-    # goal_value_model_G[1:, 0] = mdp.reward.max(axis=1)
+    goal_value_model_G[1 + 18, 0] = 1.2
 
+
+
+    goal_state = np.where(mdp.reward)[0][0]
 
     # Define Action Models
     action_models = []
     for a in range(mdp.num_actions):
         action_model = empty.copy()
         action_model[1:, 1:] = mdp.transition[:, a] * mdp.discount
-        # action_model[1:, 0] = mdp.reward[:, a]
+        action_model[1:, 0] = mdp.reward[:, a]
 
-        # Goal state transitions to an exiting self-looping state
-        action_model[7,:] = action_model[1,:] #* 0. 
+        
+        # Goal state transitions to an exiting self-looping state        
+        action_model[goal_state+1,1:] = mdp.transition[goal_state, 0]
 
-        # Specify reward in terms of state-action pair leading to a goal state
-        if a == 0:
-            action_model[8,0] = 1.
-        if a == 2:
-            action_model[12,0] = 1.
         action_models.append(action_model)
     action_models = np.array(action_models)
 
@@ -70,7 +68,8 @@ def main():
                 termination_value = termination_rasp[0]
 
 
-                if termination_value >= continuation_value:
+
+                if termination_value >= continuation_value or s_idx==goal_state:
                     if termination_value > max_val:
                         option_model_M[s.astype(bool)] = next_rasp_sA
                         max_val = termination_value
@@ -79,8 +78,7 @@ def main():
                         option_model_M[s.astype(bool)] = next_rasp_sA.dot(option_model_M)
                         max_val = continuation_value
 
-    # import pdb;
-    # pdb.set_trace()
+    # import pdb;pdb.set_trace()
     mdp.plot_ss(f"P", option_model_M[1:, 1:])
     plt.show()
     # vf = option_model_M[1:, 0]
