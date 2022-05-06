@@ -26,7 +26,7 @@ def main():
     # Define Goal Value Model
     sub_goal_state = int(num_states - np.sqrt(num_states) - 2)
     goal_value_model_G = empty.copy()
-    goal_value_model_G[1 + sub_goal_state, 0] = 1.
+    goal_value_model_G[1 + sub_goal_state, 0] = 1.2
 
 
 
