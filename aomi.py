@@ -36,20 +36,8 @@ def aomi(mdp, num_state_sweeps=1000):
     action_models = build_action_models(mdp)
 
     for i in range(num_state_sweeps):  # the most linear implementation
-        if option_model_M[1:, 1:].any():
-            mdp.plot_ss(f"option_model{i}", option_model_M[1:, 1:], min_weight=0.01)
-            plt.savefig(f"plots/option_model{i}.png")
-            plt.close()
-        else:
-            print("Option Model is empty at step", i)
-
         aomi_sweep(action_models, goal_value_model_G, mdp, option_model_M)
 
-    vf = option_model_M[1:, 0]
-    mdp.plot_s(f"vf", vf)
-    plt.show()
-    mdp.plot_ss(f"P", option_model_M[1:, 1:])
-    plt.show()
     return option_model_M
 
 
@@ -79,9 +67,21 @@ def aomi_sweep(action_models, goal_value_model_G, mdp, option_model_M):
                     max_val = continuation_value
 
 
-def main(mdp):
+def main():
     mdp = emdp.gridworld.GridWorldMDP(goal=(1, 1))
-    aomi(mdp)
+    option_model_M = aomi(mdp)
+    if option_model_M[1:, 1:].any():
+        mdp.plot_ss(f"option_model{i}", option_model_M[1:, 1:], min_weight=0.01)
+        plt.savefig(f"plots/option_model{i}.png")
+        plt.close()
+    else:
+        print("Option Model is empty at step", i)
+
+    vf = option_model_M[1:, 0]
+    mdp.plot_s(f"vf", vf)
+    plt.show()
+    mdp.plot_ss(f"P", option_model_M[1:, 1:])
+    plt.show()
 
 
 if __name__ == "__main__":

@@ -1,10 +1,10 @@
+import emdp.algorithms.tabular
+import emdp.chainworld.toy_mdps
+import emdp.gridworld
 import matplotlib.pyplot as plt
 import numpy as np
 
 import aomi
-import emdp.chainworld.toy_mdps
-import emdp.algorithms.tabular
-import emdp.gridworld
 
 
 def main():
@@ -29,6 +29,13 @@ def main():
         mdp.reward.fill(0)
         mdp.reward[rasp_idx, :] = 2
         option_model = aomi.aomi(mdp)
+
+        vf = option_model[1:, 0]
+        mdp.plot_s(f"vf", vf)
+        plt.show()
+        mdp.plot_ss(f"P", option_model[1:, 1:])
+        plt.show()
+
         option_models.append(option_model)
     mdp.reward = extrinsic_reward
 
