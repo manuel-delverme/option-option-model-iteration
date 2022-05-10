@@ -60,9 +60,9 @@ def intra_option_learning(mdp, action_models, true_value_model, sub_goal_state, 
 
 
     # import pdb;pdb.set_trace()
-        matrix = option_model_M[1:, 1:] * (1 - np.eye(option_model_M[1:, 1:].shape[0]))
-        mdp.plot_ss(f"P", matrix, min_weight=0.)
-        plt.show()
+        # matrix = option_model_M[1:, 1:] * (1 - np.eye(option_model_M[1:, 1:].shape[0]))
+        # mdp.plot_ss(f"P", matrix, min_weight=0.)
+        # plt.show()
 
     # vf = value_model[1:, 0]
     # mdp.plot_s(f"vf_subgoal{sub_goal_state}", vf)
@@ -124,7 +124,7 @@ def main():
 
     ## Learn options, this process counts for 4*2 iterations
     # subgoals = [22,38,42,58,goal_state]
-    subgoals = [22,58,38,goal_state]
+    subgoals = [22,38,58,goal_state]
 
     subgoal_initiationset={22:[14,15,16,23,24,25,32,33,34,42],
     38:[46,47,48,55,56,57,64,65,66,58,    50,51,52,59,60,61,68,69,70 ],
@@ -155,19 +155,18 @@ def main():
     # 114:[126,127,128,139,140,141,152,153,154],}
 
     option_models = []
-    option_models.extend(action_models)
     for subgoal in subgoals:
-        option_model_M = intra_option_learning(mdp, option_models, true_value_model, subgoal, subgoal_initiationset[subgoal])
+        option_model_M = intra_option_learning(mdp, action_models, true_value_model, subgoal, subgoal_initiationset[subgoal])
         option_models.append(option_model_M)
     ###
 
     
     # import pdb;pdb.set_trace()
-    
+    option_models.extend(action_models)
 
     ### SMDP Planning
     value_model = empty.copy()
-    for i in range(2):  
+    for i in range(6):  
         
         old_value_model = np.copy(value_model)
 
