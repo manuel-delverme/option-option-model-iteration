@@ -44,12 +44,12 @@ class FactorModel:
         num_factors, = f0.shape
         num_actions = len(utils.enumerate_transition.actions_str)
 
-        self.parents_lookup = np.full((num_actions, num_factors), fill_value=-1, dtype=np.int)
+        self.one_step_parents_lookup = np.full((num_actions, num_factors), fill_value=-1, dtype=np.int)
         for action in range(num_actions):
             for factor in range(num_factors):
                 canonical_action = utils.enumerate_transition.action_canonical[action]
                 parent = external.py222.moveDefs[canonical_action, factor]
-                self.parents_lookup[action, factor] = parent
+                self.one_step_parents_lookup[action, factor] = parent
 
     def __getitem__(self, args):
         factors, action = args
