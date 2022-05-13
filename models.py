@@ -35,6 +35,7 @@ class Model:
     factorize_transition = False
 
     def __init__(self, transition_model, value_model):
+        self.discount = 1.
         num_states = value_model.shape[0]
 
         if self.factorize_transition:
@@ -67,7 +68,7 @@ class Model:
 
     def dot(self, other):
         if len(other.shape) == 1:
-            return self.transition_model.dot(other) + self.value_model
+            return other[self.transition_model] * self.discount + self.value_model
         else:
             raise NotImplementedError
 
