@@ -195,7 +195,9 @@ def normFC(s):
 
 # get OP representation given FC-normalized sticker representation
 def getOP(s):
-    return pieceInds[np.dot(s[pieceDefs], hashOP)]
+    b = s[pieceDefs]
+    a = np.dot(b, hashOP)
+    return pieceInds[a]
 
 
 # get sticker representation from OP representation

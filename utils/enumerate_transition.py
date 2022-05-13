@@ -16,7 +16,7 @@ action_str_to_idx = {v: k for k, v in enumerate(actions_str)}
 action_canonical_to_idx = {v: k for k, v in action_idx_to_canonical.items()}
 
 
-def generate_state_distances_bfs():
+def generate_statespace_matrices():
     factors = external.py222.initState()
     num_actions = len(action_canonical)
     # num_factors = len(factors)
@@ -25,6 +25,7 @@ def generate_state_distances_bfs():
     opened = np.zeros(num_states, dtype=bool)
 
     transition_function = np.full((num_states, num_actions), np.nan, dtype=np.uint)
+    unhash_table = np.full((num_states, len(factors)), np.nan, dtype=np.uint)
 
     s0 = external.py222.indexOP(external.py222.getOP(factors))
 
@@ -39,6 +40,7 @@ def generate_state_distances_bfs():
             continue
 
         s0 = external.py222.indexOP(external.py222.getOP(factors))
+        unhash_table[s0] = factors
 
         for action, action_encoding in action_idx_to_canonical.items():
             # if action // 3 == last_action // 3:
@@ -57,9 +59,10 @@ def generate_state_distances_bfs():
         closed[s0] = True
 
     np.save("transition.npy", transition_function)
+    np.save("unhash.npy", unhash_table)
 
 
 if __name__ == "__main__":
     start = time.time()
-    generate_state_distances_bfs()
+    generate_statespace_matrices()
     print(time.time() - start)
