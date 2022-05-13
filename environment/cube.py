@@ -3,6 +3,7 @@ import time
 
 import tqdm
 
+import models
 import utils.enumerate_transition
 import numpy as np
 import external.py222
@@ -38,6 +39,7 @@ def unhash(s_idx):
 
 class FactorModel:
     def __init__(self):
+        raise DeprecationWarning("Use the models module")
         f0 = external.py222.initState()
         num_factors, = f0.shape
         num_actions = len(utils.enumerate_transition.actions_str)
