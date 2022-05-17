@@ -1,8 +1,8 @@
-import matplotlib.pyplot as plt
+import emdp.gridworld  # noqa
 import numpy as np
 import tqdm
 
-import environment.cube
+import environment.cube  # noqa
 import models
 
 
@@ -20,10 +20,7 @@ def define_action_models(goal_state, mdp):
     return action_models
 
 
-def main():
-    # mdp = emdp.gridworld.GridWorldMDP(goal=(1, 1), ascii_room=None)
-    mdp = environment.cube.Cube2x2()
-
+def apmi(mdp, render=False):
     # Define Option Model
     num_states = mdp.reward.shape[0]
 
@@ -35,17 +32,20 @@ def main():
     num_iters = 100_000
     pbar = tqdm.tqdm(total=num_iters)
 
-    for _ in range(num_iters):  # a matrix-based implementation
+    for i in range(num_iters):  # a matrix-based implementation
         action_values = np.zeros((num_states, mdp.num_actions))
         for action, action_model in enumerate(action_models):
             action_value = action_model.dot(value_model)
             action_values[:, action] = action_value
 
         max_q = np.max(action_values, axis=1)
-        improvement = (value_model - max_q).sum()
+        improvement = max_q - value_model
         pbar.update(1)
-        pbar.set_description(f"Improvement: {improvement}")
-        if improvement == 0:  # or < 1e-9:
+        pbar.set_description(f"Improvement: {improvement.sum()}")
+        if render:
+            _, fig = mdp.plot_s(f"Iteration: {i}", improvement)
+            fig.show()
+        if improvement.sum() == 0:  # or < 1e-9:
             break
         value_model[:] = max_q
 
@@ -53,6 +53,14 @@ def main():
     # mdp.plot_s("vf", vf)
     # plt.show()
     return value_model
+
+
+def main():
+    mdp = emdp.gridworld.GridWorldMDP(goal=(1, 1), ascii_room=None)
+    apmi(mdp)
+
+    mdp = environment.cube.Cube2x2()
+    apmi(mdp)
 
 
 if __name__ == "__main__":

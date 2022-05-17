@@ -41,6 +41,8 @@ class Model:
         if self.factorize_transition:
             self._transition_model = FactoredTransitionModel(num_states)
         else:
+            if len(transition_model.shape) == 2:
+                transition_model = transition_model.argmax(axis=1)
             self._transition_model = transition_model
         self._value_model = value_model
         self.num_states = num_states
