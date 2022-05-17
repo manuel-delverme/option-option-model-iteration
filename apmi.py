@@ -1,52 +1,57 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import emdp.chainworld.toy_mdps
-import emdp.algorithms.tabular
-import emdp.gridworld
 import tqdm
 
+import environment.cube
 import models
 
 
-def define_action_models(empty, goal_state, mdp):
+def define_action_models(goal_state, mdp):
     action_models = []
     for a in range(mdp.num_actions):
-        action_model = empty.copy()
-        action_model.value_model = mdp.reward[:, a]
+        transition_model = mdp.transition[:, a]
 
-        action_model.transition_model = mdp.transition[:, a] * mdp.discount
         # Goal state transitions to an exiting self-looping state
-        action_model.transition_model[goal_state, :] = mdp.transition[0, 0]
+        transition_model[goal_state] = mdp.transition[0, 0]
 
+        action_model = models.Model(transition_model, mdp.reward[:, a])
+        action_model.discount *= mdp.discount
         action_models.append(action_model)
     return action_models
 
 
 def main():
-    mdp = emdp.gridworld.GridWorldMDP(goal=(1, 1), ascii_room=None)
+    # mdp = emdp.gridworld.GridWorldMDP(goal=(1, 1), ascii_room=None)
+    mdp = environment.cube.Cube2x2()
 
     # Define Option Model
     num_states = mdp.reward.shape[0]
-    empty = models.Model(num_states)
 
-    value_model = models.Model(num_states)
+    value_model = np.zeros(num_states)
     goal_state = mdp.reward.max(axis=1).argmax()
 
-    action_models = define_action_models(empty, goal_state, mdp)
+    action_models = define_action_models(goal_state, mdp)
 
-    for i in tqdm.trange(75):  # a matrix-based implementation
+    num_iters = 100_000
+    pbar = tqdm.tqdm(total=num_iters)
+
+    for _ in range(num_iters):  # a matrix-based implementation
         action_values = np.zeros((num_states, mdp.num_actions))
         for action, action_model in enumerate(action_models):
-            action_value = action_model.dot(value_model.value_model)
+            action_value = action_model.dot(value_model)
             action_values[:, action] = action_value
 
-        if (value_model.value_model - np.max(action_values, axis=1)).sum() == 0.:
+        max_q = np.max(action_values, axis=1)
+        improvement = (value_model - max_q).sum()
+        pbar.update(1)
+        pbar.set_description(f"Improvement: {improvement}")
+        if improvement == 0:  # or < 1e-9:
             break
-        value_model.value_model[:] = np.max(action_values, axis=1)
+        value_model[:] = max_q
 
-    vf = value_model.value_model
-    mdp.plot_s("vf", vf)
-    plt.show()
+    # vf = value_model
+    # mdp.plot_s("vf", vf)
+    # plt.show()
     return value_model
 
 

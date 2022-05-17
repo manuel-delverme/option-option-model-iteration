@@ -44,12 +44,12 @@ class FactorModel:
         num_factors, = f0.shape
         num_actions = len(utils.enumerate_transition.actions_str)
 
-        self.parents_lookup = np.full((num_actions, num_factors), fill_value=-1, dtype=np.int)
+        self.one_step_parents_lookup = np.full((num_actions, num_factors), fill_value=-1, dtype=np.int)
         for action in range(num_actions):
             for factor in range(num_factors):
                 canonical_action = utils.enumerate_transition.action_canonical[action]
                 parent = external.py222.moveDefs[canonical_action, factor]
-                self.parents_lookup[action, factor] = parent
+                self.one_step_parents_lookup[action, factor] = parent
 
     def __getitem__(self, args):
         factors, action = args
@@ -59,6 +59,8 @@ class FactorModel:
 
 
 class Cube2x2:
+    discount = 0.9
+
     def render(self, mode="human"):
         factors = self.factors
         if mode == "human":
@@ -69,11 +71,18 @@ class Cube2x2:
         external.py222.printCube(factors)
 
     def __init__(self):
-        self.transition = FactorModel()
+        # self.transition = FactorModel()
+        self.transition = np.load("transition.npy")
+        s, a = np.where(self.transition == 0)
+
+        self.reward = np.zeros(self.transition.shape)
+        self.reward[s, a] = 1
+
         self.str_to_canonical = utils.enumerate_transition.action_str_to_canonical
         self.str_to_idx = utils.enumerate_transition.action_str_to_idx
         self.state = None
         self.factors = None
+        self.num_actions = len(utils.enumerate_transition.actions_str)
 
     def reset(self):
         self.factors = external.py222.initState()

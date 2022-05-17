@@ -18,12 +18,12 @@ f0 = external.py222.initState()
 num_factors, = f0.shape
 num_actions = len(utils.enumerate_transition.actions_str)
 
-parents_lookup = np.full((num_actions, num_factors), fill_value=-1, dtype=np.int)
+one_step_parents_lookup = np.full((num_actions, num_factors), fill_value=-1, dtype=np.int)
 for action in range(num_actions):
     for factor in range(num_factors):
         canonical_action = utils.enumerate_transition.action_canonical[action]
         parent = external.py222.moveDefs[canonical_action, factor]
-        parents_lookup[action, factor] = parent
+        one_step_parents_lookup[action, factor] = parent
 
 
 def hash_factors(factor_states):
@@ -32,18 +32,33 @@ def hash_factors(factor_states):
 
 
 class Model:
-    P = (slice(1, None, None), slice(1, None, None))
-    R = (slice(1, None, None), 0)
-    factorize_transition = 1
+    factorize_transition = False
 
-    def __init__(self, num_states):
-        self.num_states = num_states
-        self.value_model = np.zeros(num_states)
+    def __init__(self, transition_model, value_model):
+        self.discount = 1.
+        num_states = value_model.shape[0]
 
         if self.factorize_transition:
-            self.transition_model = FactoredTransitionModel()
+            self._transition_model = FactoredTransitionModel(num_states)
         else:
-            self.transition_model = np.zeros((num_states, num_states))
+            self._transition_model = transition_model
+        self._value_model = value_model
+        self.num_states = num_states
+
+    @property
+    def value_model(self):
+        return self._value_model
+
+    @property
+    def transition_model(self):
+        return self._transition_model
+
+    @transition_model.setter
+    def transition_model(self, value):
+        if isinstance(self._transition_model, FactoredTransitionModel):
+            raise NotImplementedError
+        else:
+            self._transition_model = value
 
     def copy(self):
         return self.__class__(self.num_states)
@@ -53,7 +68,7 @@ class Model:
 
     def dot(self, other):
         if len(other.shape) == 1:
-            return self.transition_model.dot(other) + self.value_model
+            return other[self.transition_model] * self.discount + self.value_model
         else:
             raise NotImplementedError
 
@@ -86,8 +101,15 @@ class Model:
 
 
 class FactoredTransitionModel:
+    def __init__(self, num_states):
+        raise NotImplementedError("it should be hardcoded for cube factors, for simplcitiy")
+        self.num_states = num_states
+
     def __getitem__(self, args):
         factor_values, action = args
-        parent_factor = parents_lookup[action]
+        parent_factor = one_step_parents_lookup[action]
         new_factors = factor_values[parent_factor]
         return hash_factors(new_factors)
+
+    def __setitem__(self, key, value):
+        raise NotImplementedError
