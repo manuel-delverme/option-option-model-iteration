@@ -70,7 +70,10 @@ class Model:
 
     def dot(self, other):
         if len(other.shape) == 1:
-            return other[self.transition_model] * self.discount + self.value_model
+            if isinstance(self.transition_model, np.ndarray):
+                return other[self.transition_model] * self.discount + self.value_model
+            else:
+                return self.transition_model(other) * self.discount + self.value_model
         else:
             raise NotImplementedError
 
@@ -104,8 +107,12 @@ class Model:
 
 class FactoredTransitionModel:
     def __init__(self, num_states):
-        raise NotImplementedError("it should be hardcoded for cube factors, for simplcitiy")
+        if num_states != unhash_table.shape[0]:
+            raise ValueError("num_states does not match the factor lookup table")
+        self.batch_size = 1024
         self.num_states = num_states
+        # raise NotImplementedError("it should be hardcoded for cube factors, for simplcitiy")
+        # self.num_states = num_states
 
     def __getitem__(self, args):
         factor_values, action = args
@@ -115,3 +122,16 @@ class FactoredTransitionModel:
 
     def __setitem__(self, key, value):
         raise NotImplementedError
+
+    def __call__(self, values):
+        states = np.arange(self.num_states)
+        factors = unhash_table[states]
+
+        for batch in range(0, values.shape[0], self.batch_size):
+            value_batch = values[batch:batch + self.batch_size]
+
+            for action in range(values.shape[1]):
+                parent_factor = one_step_parents_lookup[action]
+                new_factors = values[batch, action, parent_factor]
+                values[batch, action] = hash_factors(new_factors)
+        return self[values]

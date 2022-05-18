@@ -60,6 +60,7 @@ def main():
     print("APMI for GridWorldMDP")
     apmi(mdp)
 
+    # models.Model.factorize_transition = True
     print("APMI for CubeMDP")
     mdp = environment.cube.Cube2x2()
     apmi(mdp)
