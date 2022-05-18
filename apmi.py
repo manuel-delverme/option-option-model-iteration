@@ -41,7 +41,7 @@ def apmi(mdp, render=False):
         max_q = np.max(action_values, axis=1)
         improvement = max_q - value_model
         pbar.update(1)
-        pbar.set_description(f"Improvement: {improvement.sum()}")
+        pbar.set_description(f"Improvement: {improvement.sum()}, nonzeros {np.count_nonzero(improvement)}")
         if render:
             _, fig = mdp.plot_s(f"Iteration: {i}", improvement)
             fig.show()
@@ -57,8 +57,10 @@ def apmi(mdp, render=False):
 
 def main():
     mdp = emdp.gridworld.GridWorldMDP(goal=(1, 1), ascii_room=None)
+    print("APMI for GridWorldMDP")
     apmi(mdp)
 
+    print("APMI for CubeMDP")
     mdp = environment.cube.Cube2x2()
     apmi(mdp)
 
