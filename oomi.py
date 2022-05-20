@@ -14,14 +14,17 @@ def intra_option_learning(mdp, action_models, sub_goal_state, sub_goal_initiatio
     option_model_M = models.DeterministicModel(np.zeros((num_states, num_states)), np.zeros(num_states), discount=mdp.discount)
 
     # Define Goal Value Model
-    goal_value_model_G_ = np.zeros((num_states, 1))
-    goal_value_model_G_[sub_goal_state, 0] = 1 if sub_goal_state != goal_state else 0.
+    # goal_value_model_G_ = np.zeros((num_states, 1))
+    # goal_value_model_G_[sub_goal_state, 0] = 1 if sub_goal_state != goal_state else 0.
+    # goal_value_model_G = models.DeterministicModel(
+    #     np.zeros((num_states, num_states)),
+    #     goal_value_model_G_[1:, 0],
+    #     discount=1.
+    # )
+    goal_value_model_G_ = np.zeros((1 + num_states, 1 + num_states))
+    goal_value_model_G_[1 + sub_goal_state, 0] = 1 if sub_goal_state != goal_state else 0.  # One step too much, but idk what happens here
+    goal_value_model_G = models.DeterministicModel(goal_value_model_G_[1:, 1:], goal_value_model_G_[1:, 0], discount=1.)
 
-    goal_value_model_G = models.DeterministicModel(
-        np.zeros((num_states, num_states)),
-        goal_value_model_G_[1:, 0],
-        discount=1.
-    )
     old_P = None
 
     for i in range(100):  # 4 Iterations per option (first one is artefact of MDP)
@@ -53,7 +56,6 @@ def intra_option_learning(mdp, action_models, sub_goal_state, sub_goal_initiatio
             if improvement == 0:
                 break
         old_P = P
-        plot_model(mdp, option_model_M)
 
     return option_model_M
 
@@ -146,31 +148,36 @@ def main():
         init_set = subgoal_initiationset[subgoal]
         option_model_M = intra_option_learning(mdp, option_models, subgoal, init_set)
         option_models.append(option_model_M)
+    # plot_model(mdp, option_model_M)
 
     ### SMDP Planning
-    value_model = models.DeterministicModel(num_states)
+    smdp_value_model = models.DeterministicModel(
+        np.zeros((num_states, num_states)),
+        np.zeros((num_states, 1)),
+        discount=1.
+    )
     for i in range(2):
-
-        old_value_model = np.copy(value_model)
+        old_value_model = smdp_value_model.copy()
 
         for s_idx in range(mdp.num_states):
-            s = np.eye(mdp.num_states + 1)[s_idx + 1]
+            # s = np.eye(mdp.num_states + 1)[s_idx + 1]
             max_val = -np.inf
 
             # old_value_model = np.copy(value_model)
 
             for option, option_model in enumerate(option_models):
+                # if s_idx not in subgoal_initiationset[subgoals[option]]:
+                #    continue
+                s1, r1 = option_model[s_idx]
 
-                next_rasp_sO = s.compose(option_model)
-                option_value_row = next_rasp_sO.compose(old_value_model)
+                s2, r2 = option_model.project(s1, r1)
+                (s3, r3) = old_value_model.project(s2, r2)
 
-                # if option==4 and s_idx==22:
+                if r3 > max_val:
+                    smdp_value_model[s_idx] = (s3, r3)
+                    max_val = r3
 
-                if option_value_row[0] > max_val:
-                    value_model[s_idx + 1] = option_value_row
-                    max_val = option_value_row[0]
-
-        vf = value_model[1:, 0]
+        vf = smdp_value_model.value_model
         mdp.plot_s("vf", vf)
         plt.show()
 

@@ -2,6 +2,7 @@ import copy
 
 import numpy as np
 
+
 class DeterministicModel:
     def __init__(self, transition_matrix, value_model, discount):
         self.discount = discount
@@ -48,8 +49,11 @@ class DeterministicModel:
             raise NotImplementedError
 
     def project(self, state_idx, value):
+        if state_idx == self.void_state:
+            return self.void_state, 0
         s1 = self.transition_model[state_idx]
-        return s1, value
+        v1 = self.value_model[state_idx] + value  # TODO: check if this is correct
+        return s1, v1
 
     def __getitem__(self, state_idx):
         if state_idx == self.void_state:
