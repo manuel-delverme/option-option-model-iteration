@@ -12,10 +12,9 @@ def define_action_models(goal_state, mdp):
         transition_model = mdp.transition[:, a]
 
         # Goal state transitions to an exiting self-looping state
-        transition_model[goal_state] = mdp.transition[0, 0]
+        transition_model[goal_state] = np.eye(mdp.num_states)[goal_state]
 
-        action_model = models.Model(transition_model, mdp.reward[:, a])
-        action_model.discount *= mdp.discount
+        action_model = models.DeterministicModel(transition_model, mdp.reward[:, a], mdp.discount)
         action_models.append(action_model)
     return action_models
 
@@ -35,7 +34,7 @@ def apmi(mdp, render=False):
     for i in range(num_iters):  # a matrix-based implementation
         action_values = np.zeros((num_states, mdp.num_actions))
         for action, action_model in enumerate(action_models):
-            action_value = action_model.dot(value_model)
+            action_value = action_model.compose(value_model)
             action_values[:, action] = action_value
 
         max_q = np.max(action_values, axis=1)

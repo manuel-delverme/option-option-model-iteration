@@ -3,94 +3,76 @@ import numpy as np
 import emdp.chainworld.toy_mdps
 import emdp.algorithms.tabular
 import emdp.gridworld
+import apmi
+import constants
+import models
 
 
-def intra_option_learning(mdp, action_models, true_value_model, sub_goal_state, sub_goal_initiation_set):
-    # import pdb;pdb.set_trace()
-
-    num_states = mdp.reward.shape[0]
-    empty = np.zeros((1 + num_states, 1 + num_states))
-    empty[0, 0] = 1
-
+def intra_option_learning(mdp, action_models, sub_goal_state, sub_goal_initiation_set):
+    num_states = mdp.num_states
     goal_state = np.where(mdp.reward)[0][0]
-    # option_model_M = true_value_model.copy()
-    option_model_M = empty.copy()
+    option_model_M = models.DeterministicModel(np.zeros((num_states, num_states)), np.zeros(num_states), discount=mdp.discount)
 
     # Define Goal Value Model
-    goal_value_model_G = empty.copy()
-    goal_value_model_G[1 + sub_goal_state, 0] = 1 if sub_goal_state != goal_state else 0.
+    goal_value_model_G_ = np.zeros((num_states, 1))
+    goal_value_model_G_[sub_goal_state, 0] = 1 if sub_goal_state != goal_state else 0.
 
+    goal_value_model_G = models.DeterministicModel(
+        np.zeros((num_states, num_states)),
+        goal_value_model_G_[1:, 0],
+        discount=1.
+    )
+    old_P = None
 
-    value_model=empty.copy()
-
-    for i in range(5): # 4 Iterations per option (first one is artefact of MDP)
-
+    for i in range(100):  # 4 Iterations per option (first one is artefact of MDP)
         old_option_model_M = option_model_M.copy()  # save model for calculations
-        old_value_model = np.copy(value_model)
-
+        old_option_value_MG = old_option_model_M.compose(goal_value_model_G)
 
         for s_idx in sub_goal_initiation_set:
-            s = np.eye(mdp.num_states + 1)[s_idx + 1]
             max_val = -np.inf
 
-            # old_option_model_M = option_model_M.copy()  # save model for calculations
-
             for action, action_model in enumerate(action_models):
-                next_rasp_sA = s.dot(action_model)
-                old_option_value_MG = np.einsum("st,tu->su", old_option_model_M, goal_value_model_G)
+                s1, r = action_model[s_idx]
+                cont_s2, continuation_value = old_option_value_MG[s1]
+                term_s2, termination_value = goal_value_model_G[s1]
 
-                continuation_rasp = next_rasp_sA.dot(old_option_value_MG)
-                termination_rasp = next_rasp_sA.dot(goal_value_model_G)
-
-                continuation_value = continuation_rasp[0]
-                termination_value = termination_rasp[0]
-
-
-
-                if termination_value >= continuation_value or s_idx==goal_state:
+                if termination_value >= continuation_value or s_idx == goal_state:
                     if termination_value > max_val:
-                        option_model_M[s.astype(bool)] = next_rasp_sA
-                        value_model[1+s_idx] = termination_rasp
+                        option_model_M[s_idx] = (s1, r)
                         max_val = termination_value
                 else:
                     if continuation_value > max_val:
-                        option_model_M[s.astype(bool)] = next_rasp_sA.dot(option_model_M)
-                        value_model[1+s_idx] = continuation_value
+                        option_model_M[s_idx] = option_model_M.project(s1, r)
                         max_val = continuation_value
 
-
-    # import pdb;pdb.set_trace()
-        matrix = option_model_M[1:, 1:] * (1 - np.eye(option_model_M[1:, 1:].shape[0]))
-        mdp.plot_ss(f"P", matrix, min_weight=0.)
-        plt.show()
-
-    # vf = value_model[1:, 0]
-    # mdp.plot_s(f"vf_subgoal{sub_goal_state}", vf)
-    # plt.show()
+        P = option_model_M.transition_model.copy()
+        if i > 0:
+            no_edge = P == option_model_M.void_state
+            improvement = (P != old_P)[~no_edge].sum()
+            print("Iteration:", i, "Improvement:", improvement)
+            if improvement == 0:
+                break
+        old_P = P
+        plot_model(mdp, option_model_M)
 
     return option_model_M
 
+
+def plot_model(mdp, option_model_M):
+    P = option_model_M.transition_model.copy()
+    no_edge = P == option_model_M.void_state
+    P[no_edge] = 0.
+    # P = P.astype(int)
+    P_matrix = np.eye(P.shape[0])[P]
+    P_matrix[no_edge] = 0.
+    matrix = P_matrix * (1 - np.eye(P_matrix.shape[0]))  # What happens here?
+    matrix[no_edge] += (np.eye(P_matrix.shape[0]) * 0.01)[no_edge]
+    mdp.plot_ss(f"P", matrix, min_weight=0.)
+    plt.show()
+
+
 def main():
-
-    # from apmi import main as apmi
-    # true_value_model = apmi()
-    true_value_model=None
-
-    ascii_room = """
-    #############
-    #   #   #   #
-    #           #
-    #   #   #   #
-    ## ### ### ##
-    #   #   #   #
-    #           #
-    #   #   #   #
-    ## ### ### ##
-    #   #   #   #
-    #           #
-    #   #   #   #
-    #############"""[1:].split('\n')
-
+    true_value_model = None
     ascii_room = """
     #########
     #   #   #
@@ -105,33 +87,38 @@ def main():
     mdp = emdp.gridworld.GridWorldMDP(goal=(1, 1), ascii_room=ascii_room)
     goal_state = np.where(mdp.reward)[0][0]
 
-
-    ### Define Action Models
     num_states = mdp.reward.shape[0]
-    empty = np.zeros((1 + num_states, 1 + num_states))
-    empty[0, 0] = 1
-    action_models = []
-    for a in range(mdp.num_actions):
-        action_model = empty.copy()
-        action_model[1:, 1:] = mdp.transition[:, a] * mdp.discount
-        action_model[1:, 0] = mdp.reward[:, a]
-        # Goal state transitions to an exiting self-looping state        
-        action_model[goal_state+1,1:] = mdp.transition[0, 0] 
-        action_models.append(action_model)
-    action_models = np.array(action_models)
-    ###
+    # empty = models.Model(num_states)
+    # empty = np.zeros((1 + num_states, 1 + num_states))
+    # empty[0, 0] = 1
+    # action_models = []
+    action_models = apmi.define_action_models(goal_state, mdp)
 
-
-    ## Learn options, this process counts for 4*2 iterations
+    # Learn options, this process counts for 4*2 iterations
     # subgoals = [22,38,42,58,goal_state]
-    subgoals = [22,58,38,goal_state]
+    subgoals = [
+        constants.NORTH_BOTTLENECK,
+        constants.SOUTH_BOTTLENECK,
+        constants.WEST_BOTTLENECK,
+        goal_state
+    ]
 
-    subgoal_initiationset={22:[14,15,16,23,24,25,32,33,34,42],
-    38:[46,47,48,55,56,57,64,65,66,58,    50,51,52,59,60,61,68,69,70 ],
-    # 42:[50,51,52,59,60,61,68,69,70],
-    58:[50,51,52,59,60,61,68,69,70],
-    goal_state:[10,11,12,19,20,21,28,29,30,22,38],}
-
+    subgoal_initiationset = {
+        # constants.NORTH_BOTTLENECK: [
+        #     12,     14, 15, 16,
+        #     21,     23, 24, 25,
+        #     30,     32, 33, 34,
+        # ],
+        constants.NORTH_BOTTLENECK: [
+            14, 15, 16,
+            23, 24, 25,
+            32, 33, 34,
+        ],
+        constants.WEST_BOTTLENECK: [46, 47, 48, 55, 56, 57, 64, 65, 66, 58, 50, 51, 52, 59, 60, 61, 68, 69, 70],
+        # EAST_BOTTLENECK:[50,51,52,59,60,61,68,69,70],
+        constants.SOUTH_BOTTLENECK: [50, 51, 52, 59, 60, 61, 68, 69, 70],
+        goal_state: [10, 11, 12, 19, 20, 21, 28, 29, 30, 22, 38],
+    }
 
     # subgoals=[goal_state,30,34,54,58,62,106,110,114]
     # subgoal_initiationset={goal_state:[14,15,16,27,28,29,40,41,42,54,30],
@@ -154,41 +141,34 @@ def main():
     # 110:[122,123,124,135,136,137,148,149,150,138],
     # 114:[126,127,128,139,140,141,152,153,154],}
 
-    option_models = []
-    option_models.extend(action_models)
+    option_models = action_models
     for subgoal in subgoals:
-        option_model_M = intra_option_learning(mdp, option_models, true_value_model, subgoal, subgoal_initiationset[subgoal])
+        init_set = subgoal_initiationset[subgoal]
+        option_model_M = intra_option_learning(mdp, option_models, subgoal, init_set)
         option_models.append(option_model_M)
-    ###
-
-    
-    # import pdb;pdb.set_trace()
-    
 
     ### SMDP Planning
-    value_model = empty.copy()
-    for i in range(2):  
-        
+    value_model = models.DeterministicModel(num_states)
+    for i in range(2):
+
         old_value_model = np.copy(value_model)
 
         for s_idx in range(mdp.num_states):
             s = np.eye(mdp.num_states + 1)[s_idx + 1]
             max_val = -np.inf
-            
+
             # old_value_model = np.copy(value_model)
 
             for option, option_model in enumerate(option_models):
-                
-                next_rasp_sO = s.dot(option_model)
-                option_value_row = next_rasp_sO.dot(old_value_model)
+
+                next_rasp_sO = s.compose(option_model)
+                option_value_row = next_rasp_sO.compose(old_value_model)
 
                 # if option==4 and s_idx==22:
-                
+
                 if option_value_row[0] > max_val:
                     value_model[s_idx + 1] = option_value_row
                     max_val = option_value_row[0]
-
-
 
         vf = value_model[1:, 0]
         mdp.plot_s("vf", vf)
@@ -196,5 +176,9 @@ def main():
 
     # print(np.sum(value_model-true_value_model))
 
+
 if __name__ == "__main__":
+    # TODO: http://algdb.net/puzzle/222
+    # 1) implement ^
+    #     do OOMI
     main()
